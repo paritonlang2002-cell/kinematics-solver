@@ -1,0 +1,463 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kinematics Solver</title>
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:Arial,sans-serif;
+  background:#eef3fb;
+  color:#17233c;
+  padding:24px 15px;
+}
+.container{max-width:850px;margin:auto}
+header{text-align:center;margin-bottom:25px}
+header h1{font-size:30px;margin:0 0 8px;color:#1746a2}
+header p{color:#63718a;margin:0;line-height:1.5}
+.panel{
+  background:white;
+  border-radius:16px;
+  padding:22px;
+  margin-bottom:18px;
+  box-shadow:0 5px 20px rgba(25,50,90,.07);
+}
+h2{font-size:19px;margin:0 0 16px}
+.fields{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:14px;
+}
+.field label{
+  display:block;
+  font-size:14px;
+  font-weight:bold;
+  margin-bottom:7px;
+}
+.field input{
+  width:100%;
+  padding:12px;
+  border:1px solid #ccd6e5;
+  border-radius:9px;
+  font-size:16px;
+  outline:none;
+}
+.field input:focus{border-color:#3478ee;box-shadow:0 0 0 3px #3478ee18}
+.field small{display:block;color:#78869b;margin-top:5px}
+.actions{display:flex;gap:10px;margin-top:20px;flex-wrap:wrap}
+button{
+  border:0;
+  border-radius:9px;
+  padding:12px 18px;
+  font-size:14px;
+  font-weight:bold;
+  cursor:pointer;
+}
+.solve{background:#2463dc;color:white;flex:1}
+.reset{background:#e9eef7;color:#34435e}
+button:hover{filter:brightness(.96)}
+.message{
+  display:none;
+  margin-top:15px;
+  padding:12px;
+  border-radius:9px;
+  font-size:14px;
+  line-height:1.5;
+}
+.error{display:block;background:#fff0ef;color:#b52d26}
+.success{display:block;background:#eaf8ef;color:#176b39}
+.results{display:none}
+.result-grid{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:12px;
+}
+.result{
+  background:#f0f5ff;
+  border-radius:11px;
+  padding:15px;
+}
+.result span{display:block;color:#65758e;font-size:13px;margin-bottom:7px}
+.result strong{font-size:23px;color:#1746a2;overflow-wrap:anywhere}
+.result small{display:block;color:#65758e;margin-top:5px}
+.work{
+  background:#f7f9fc;
+  padding:15px;
+  border-radius:10px;
+  line-height:1.8;
+  font-size:14px;
+  overflow-wrap:anywhere;
+}
+.formulas{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:12px;
+}
+.formula{
+  background:#f4f7fc;
+  padding:14px;
+  border-radius:10px;
+  text-align:center;
+}
+.formula strong{display:block;color:#1746a2;font-size:17px;margin-bottom:6px}
+.formula span{color:#5e6c82;font-size:14px}
+.note{font-size:13px;color:#718097;line-height:1.6;margin:14px 0 0}
+footer{text-align:center;color:#8995a8;font-size:12px;padding:12px}
+@media(max-width:520px){
+  .fields,.result-grid,.formulas{grid-template-columns:1fr}
+  .panel{padding:17px}
+  header h1{font-size:25px}
+}
+</style>
+</head>
+<body>
+<div class="container">
+
+<header>
+  <h1>⚡ Kinematics Solver</h1>
+  <p>Enter three known values and discover the remaining two.</p>
+</header>
+
+<section class="panel">
+  <h2>Enter Known Values</h2>
+  <div class="fields">
+
+    <div class="field">
+      <label for="u">Initial Velocity (u)</label>
+      <input id="u" type="number" step="any" placeholder="m/s">
+      <small>Velocity at the beginning</small>
+    </div>
+
+    <div class="field">
+      <label for="v">Final Velocity (v)</label>
+      <input id="v" type="number" step="any" placeholder="m/s">
+      <small>Velocity at the end</small>
+    </div>
+
+    <div class="field">
+      <label for="a">Acceleration (a)</label>
+      <input id="a" type="number" step="any" placeholder="m/s²">
+      <small>Rate of change of velocity</small>
+    </div>
+
+    <div class="field">
+      <label for="s">Displacement (s)</label>
+      <input id="s" type="number" step="any" placeholder="m">
+      <small>Change in position</small>
+    </div>
+
+    <div class="field">
+      <label for="t">Time (t)</label>
+      <input id="t" type="number" step="any" placeholder="seconds">
+      <small>Time interval (non-negative)</small>
+    </div>
+
+  </div>
+
+  <div class="actions">
+    <button class="solve" onclick="solve()">Solve Kinematics</button>
+    <button class="reset" onclick="resetAll()">Reset</button>
+  </div>
+
+  <div id="message" class="message"></div>
+  <p class="note">Leave exactly two fields empty. Use consistent SI units: m, m/s, m/s², and seconds. Velocities, acceleration, and displacement may be positive or negative according to your chosen direction.</p>
+</section>
+
+<section class="panel results" id="results">
+  <h2>🎯 Solved Values</h2>
+  <div class="result-grid" id="resultGrid"></div>
+</section>
+
+<section class="panel results" id="workingPanel">
+  <h2>🧮 Calculation Check</h2>
+  <div class="work" id="working"></div>
+</section>
+
+<section class="panel">
+  <h2>Equations of Motion (SUVAT)</h2>
+  <div class="formulas">
+    <div class="formula">
+      <strong>v = u + at</strong>
+      <span>Velocity-time relation</span>
+    </div>
+    <div class="formula">
+      <strong>s = ut + ½at²</strong>
+      <span>Displacement-time relation</span>
+    </div>
+    <div class="formula">
+      <strong>v² = u² + 2as</strong>
+      <span>Velocity-displacement relation</span>
+    </div>
+    <div class="formula">
+      <strong>s = ½(u + v)t</strong>
+      <span>Average velocity relation</span>
+    </div>
+  </div>
+  <p class="note">These equations assume constant acceleration in one dimension. The solver searches for real, physically consistent solutions. Some special input combinations can have no solution or more than one solution.</p>
+</section>
+
+</div>
+
+<script>
+const names = {
+  u:{name:"Initial Velocity",unit:"m/s"},
+  v:{name:"Final Velocity",unit:"m/s"},
+  a:{name:"Acceleration",unit:"m/s²"},
+  s:{name:"Displacement",unit:"m"},
+  t:{name:"Time",unit:"s"}
+};
+
+const keys=["u","v","a","s","t"];
+
+function getValues(){
+  const values={};
+  keys.forEach(k=>{
+    const raw=document.getElementById(k).value.trim();
+    values[k]=raw===""?null:Number(raw);
+  });
+  return values;
+}
+
+function equations(z,unknown,scale){
+  const values={...z};
+  unknown.forEach((k,i)=>values[k]=z._base[k]+z._scale[k]*0);
+  // Unknowns are supplied as normalized values.
+  unknown.forEach((k,i)=>values[k]=z._scale[k]*arguments[3][i]);
+
+  const {u,v,a,s,t}=values;
+  return [
+    (v-u-a*t)/scale.v,
+    (s-u*t-0.5*a*t*t)/scale.s,
+    (v*v-u*u-2*a*s)/scale.v2
+  ];
+}
+
+function residuals(values,scale){
+  const {u,v,a,s,t}=values;
+  return [
+    (v-u-a*t)/scale.v,
+    (s-u*t-0.5*a*t*t)/scale.s,
+    (v*v-u*u-2*a*s)/scale.v2
+  ];
+}
+
+function magnitude(values){
+  return Math.sqrt(values.reduce((sum,x)=>sum+x*x,0));
+}
+
+function solveLinear2(A,b){
+  const det=A[0][0]*A[1][1]-A[0][1]*A[1][0];
+  if(Math.abs(det)<1e-16)return null;
+  return [
+    (b[0]*A[1][1]-b[1]*A[0][1])/det,
+    (A[0][0]*b[1]-A[1][0]*b[0])/det
+  ];
+}
+
+function solveNumerically(known,unknown){
+  const scale={
+    v:Math.max(1,Math.abs(known.u||0),Math.abs(known.v||0)),
+    s:Math.max(1,Math.abs(known.s||0),Math.abs(known.u||0)*Math.abs(known.t||0)),
+    v2:Math.max(1,Math.pow(known.u||0,2),Math.pow(known.v||0,2))
+  };
+
+  const variableScale={};
+  variableScale.u=scale.v;
+  variableScale.v=scale.v;
+  variableScale.a=Math.max(1,scale.v/Math.max(1,Math.abs(known.t||0)));
+  variableScale.s=scale.s;
+  variableScale.t=Math.max(1,scale.s/scale.v);
+
+  // Improve scales using all known values.
+  keys.forEach(k=>{
+    if(known[k]!==null)variableScale[k]=Math.max(1,Math.abs(known[k]));
+  });
+
+  const evaluate=(x)=>{
+    const values={...known};
+    unknown.forEach((k,i)=>values[k]=x[i]*variableScale[k]);
+    return {values,r:residuals(values,scale)};
+  };
+
+  const seeds=[-8,-4,-2,-1,0,1,2,4,8];
+  const solutions=[];
+
+  for(const p of seeds){
+    for(const q of seeds){
+      let x=[p,q];
+      let lambda=0.001;
+
+      for(let iteration=0;iteration<220;iteration++){
+        const current=evaluate(x);
+        const r=current.r;
+        const cost=magnitude(r);
+        if(!Number.isFinite(cost))break;
+
+        const h=1e-5;
+        const J=[[],[],[]];
+
+        for(let j=0;j<2;j++){
+          const shifted=[...x];
+          shifted[j]+=h;
+          const rr=evaluate(shifted).r;
+          for(let i=0;i<3;i++)J[i][j]=(rr[i]-r[i])/h;
+        }
+
+        const A=[
+          [0,0],
+          [0,0]
+        ];
+        const b=[0,0];
+
+        for(let i=0;i<3;i++){
+          for(let j=0;j<2;j++){
+            b[j]-=J[i][j]*r[i];
+            for(let k=0;k<2;k++)A[j][k]+=J[i][j]*J[i][k];
+          }
+        }
+
+        A[0][0]+=lambda;
+        A[1][1]+=lambda;
+
+        const step=solveLinear2(A,b);
+        if(!step)break;
+
+        const next=[x[0]+step[0],x[1]+step[1]];
+        const nextCost=magnitude(evaluate(next).r);
+
+        if(Number.isFinite(nextCost)&&nextCost<cost){
+          x=next;
+          lambda=Math.max(1e-12,lambda*0.35);
+          if(nextCost<1e-9)break;
+        }else{
+          lambda*=10;
+          if(lambda>1e12)break;
+        }
+      }
+
+      const final=evaluate(x);
+      if(magnitude(final.r)<1e-7&&
+         Object.values(final.values).every(Number.isFinite)){
+        if(final.values.t < -1e-7)continue;
+
+        const duplicate=solutions.some(sol=>
+          unknown.every(k=>
+            Math.abs(sol[k]-final.values[k])<
+            1e-5*Math.max(1,Math.abs(final.values[k]))
+          )
+        );
+
+        if(!duplicate)solutions.push(final.values);
+      }
+    }
+  }
+  return solutions;
+}
+
+function solve(){
+  const values=getValues();
+  const knownKeys=keys.filter(k=>values[k]!==null);
+  const unknown=keys.filter(k=>values[k]===null);
+  const message=document.getElementById("message");
+
+  document.getElementById("results").style.display="none";
+  document.getElementById("workingPanel").style.display="none";
+  message.className="message";
+
+  if(knownKeys.length!==3){
+    message.textContent="Please enter exactly three known values and leave two fields empty.";
+    message.classList.add("error");
+    return;
+  }
+
+  if(Object.values(values).some(v=>v!==null&&!Number.isFinite(v))){
+    message.textContent="Please enter valid numerical values.";
+    message.classList.add("error");
+    return;
+  }
+
+  if(values.t!==null&&values.t<0){
+    message.textContent="Time cannot be negative.";
+    message.classList.add("error");
+    return;
+  }
+
+  const solutions=solveNumerically(values,unknown);
+
+  if(solutions.length===0){
+    message.textContent="No consistent real solution was found. Check your values, signs, and units. This combination may also be degenerate.";
+    message.classList.add("error");
+    return;
+  }
+
+  const solution=solutions[0];
+  const multiple=solutions.length>1;
+
+  const grid=document.getElementById("resultGrid");
+  grid.innerHTML="";
+
+  unknown.forEach(k=>{
+    const card=document.createElement("div");
+    card.className="result";
+    card.innerHTML=`
+      <span>${names[k].name}</span>
+      <strong>${format(solution[k])}</strong>
+      <small>${names[k].unit}</small>
+    `;
+    grid.appendChild(card);
+  });
+
+  document.getElementById("results").style.display="block";
+
+  const {u,v,a,s,t}=solution;
+  const checks=[
+    ["v = u + at",v,u+a*t],
+    ["s = ut + ½at²",s,u*t+0.5*a*t*t],
+    ["v² = u² + 2as",v*v,u*u+2*a*s]
+  ];
+
+  let html="<strong>Known values:</strong><br>";
+  knownKeys.forEach(k=>{
+    html+=`${names[k].name}: ${format(values[k])} ${names[k].unit}<br>`;
+  });
+
+  html+="<br><strong>Equation verification:</strong><br>";
+
+  checks.forEach(([label,left,right])=>{
+    html+=`${label}<br>`;
+    html+=`Left side: ${format(left)}<br>`;
+    html+=`Right side: ${format(right)}<br>`;
+    html+=`Difference: ${format(left-right)}<br><br>`;
+  });
+
+  if(multiple){
+    html+=`<strong>Note:</strong> ${solutions.length} distinct solutions were found. The displayed result is one of them.`;
+  }
+
+  document.getElementById("working").innerHTML=html;
+  document.getElementById("workingPanel").style.display="block";
+
+  message.textContent=multiple
+    ?"A consistent solution was found. Multiple mathematical solutions are possible; see the calculation note."
+    :"A consistent solution was found and verified using all three equations of motion.";
+  message.classList.add("success");
+}
+
+function format(number){
+  if(Math.abs(number)<1e-10)return "0";
+  return Number(number.toPrecision(7)).toString();
+}
+
+function resetAll(){
+  keys.forEach(k=>document.getElementById(k).value="");
+  document.getElementById("message").className="message";
+  document.getElementById("message").textContent="";
+  document.getElementById("results").style.display="none";
+  document.getElementById("workingPanel").style.display="none";
+}
+</script>
+</body>
+</html>
